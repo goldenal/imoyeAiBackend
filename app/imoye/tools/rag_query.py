@@ -33,7 +33,7 @@ def rag_query(
     """
     try:
 
-        # Check if the corpus exists
+        # Check if the corpus exists y
         if not check_corpus_exists(corpus_name, tool_context):
             return {
                 "status": "error",
