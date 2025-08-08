@@ -13,6 +13,13 @@ from dotenv import load_dotenv
 # Load environment variables
 env_path = Path(__file__).resolve().parent / ".env"
 load_dotenv()
+google_creds_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+if google_creds_json:
+    creds_path = "/tmp/google_creds.json"
+    with open(creds_path, "w") as f:
+        f.write(google_creds_json)
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_path
+
 
 
 # Get Vertex AI configuration from environment
