@@ -14,4 +14,4 @@ COPY . .
 
 # This command uses Gunicorn to start the server
 # It automatically uses the $PORT variable from Cloud Run
-CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "--workers", "1", "--worker-class", "uvicorn.workers.UvicornWorker", "main:app"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
