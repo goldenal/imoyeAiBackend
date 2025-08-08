@@ -21,7 +21,7 @@ from google.adk.runners import Runner
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.genai import types
 
-from imoye.agent import ragVoice, root_agent
+from app.imoye.agent import ragVoice, root_agent
 
 
 # Load environment variables
