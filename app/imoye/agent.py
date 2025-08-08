@@ -18,7 +18,7 @@ from google.adk.tools.agent_tool import AgentTool
 root_agent = Agent(
     name="imoye",
     # Using Gemini 2.5 Flash for best performance with RAG operations
-    model="gemini-2.0-flash-exp",
+    model="gemini-2.5-flash",
     description="Vertex AI RAG Agent",
     tools=[
         rag_query,
@@ -122,13 +122,13 @@ root_agent = Agent(
 )
 #### business_corpora
 
-# root_agent = Agent(
-#     name="RagVoiceAgent",
-#     model="gemini-2.0-flash-exp", # Using a more recent model
-#     description="Query a rag service using natural language vooice and text from users",
-#     tools=[ AgentTool(rag_agent)], # <--Register the tools here
-#     instruction= "you are a rag query assistant agent, you take input and query the rag service using the  rag_agent tool, "
-# )
+ragVoice = Agent(
+    name="ragVoice",
+    model="gemini-2.0-flash-exp", # Using a more recent model
+    description="Query a rag service using natural language vooice and text from users",
+    tools=[ AgentTool(root_agent)], # <--Register the tools here
+    instruction= "you are a rag query assistant agent, you take input and query the rag service using the  root_agent tool, "
+)
 
 
 #root_agent = Agent(

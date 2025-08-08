@@ -21,7 +21,7 @@ from google.adk.runners import Runner
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.genai import types
 
-from imoye.agent import root_agent
+from imoye.agent import ragVoice, root_agent
 
 
 # Load environment variables
@@ -62,7 +62,7 @@ def start_agent_session(session_id, is_audio=False):
 
     runner = Runner(
         app_name=APP_NAME,
-        agent=root_agent,
+        agent=ragVoice,
         session_service=session_service,
     )
 
@@ -196,9 +196,8 @@ async def chat_with_agent(session_id: str, payload: dict):
             raise HTTPException(status_code=400, detail="Message field is required")
 
         # Create a session if not already created
-        session = session_service.get_session(session_id)
-        if session is None:
-            session = session_service.create_session(
+       
+        session = session_service.create_session(
                 app_name=APP_NAME,
                 user_id=session_id,
                 session_id=session_id,
@@ -212,18 +211,28 @@ async def chat_with_agent(session_id: str, payload: dict):
         )
 
         # Prepare content for the agent
-        content = types.Content(role="user", parts=[types.Part.from_text(message)])
+        content = types.Content(role="user", parts=[types.Part.from_text(text=message)])
 
         # Run a single request (non-streaming)
-        result = await runner.run_once(session=session, content=content)
+        result =  runner.run_async(session_id=session_id, new_message=content, user_id=session_id)
 
         # Parse result
-        parts = result.content.parts if result and result.content else []
-        responses = [part.text for part in parts if isinstance(part, types.Part) and part.text]
+        responses = []
+        turn_complete = False
+        async for item in result:
+            if hasattr(item, "content") and hasattr(item.content, "parts"):
+                parts = item.content.parts
+                responses.extend([part.text for part in parts if isinstance(part, types.Part) and part.text])
+            if hasattr(item, "turn_complete"):
+                turn_complete = item.turn_complete
+
+        if not responses:
+            logger.warning(f"No valid responses received for session {session_id}")
+            return {"responses": [], "turn_complete": turn_complete}
 
         return {
             "responses": responses,
-            "turn_complete": result.turn_complete if result else False,
+            "turn_complete": turn_complete,
         }
 
     except Exception as e:

@@ -5,12 +5,15 @@ A package for interacting with Google Cloud Vertex AI RAG capabilities.
 """
 
 import os
+from pathlib import Path
 
 import vertexai
 from dotenv import load_dotenv
 
 # Load environment variables
+env_path = Path(__file__).resolve().parent / ".env"
 load_dotenv()
+
 
 # Get Vertex AI configuration from environment
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
