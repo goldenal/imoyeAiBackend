@@ -15,30 +15,28 @@ from ..config import (
 )
 from .utils import check_corpus_exists, get_corpus_resource_name
 
+from typing import List, Optional
 
 def add_data(
     corpus_name: str,
     paths: List[str],
-    tool_context: ToolContext,
+    tool_context: Optional[ToolContext] = None,
+    corpus_resource_name: Optional[str] = None,
 ) -> dict:
     """
     Add new data sources to a Vertex AI RAG corpus.
 
     Args:
-        corpus_name (str): The name of the corpus to add data to. If empty, the current corpus will be used.
+        corpus_name (str): The name of the corpus to add data to.
         paths (List[str]): List of URLs or GCS paths to add to the corpus.
-                          Supported formats:
-                          - Google Drive: "https://drive.google.com/file/d/{FILE_ID}/view"
-                          - Google Docs/Sheets/Slides: "https://docs.google.com/{type}/d/{FILE_ID}/..."
-                          - Google Cloud Storage: "gs://{BUCKET}/{PATH}"
-                          Example: ["https://drive.google.com/file/d/123", "gs://my_bucket/my_files_dir"]
-        tool_context (ToolContext): The tool context
+        tool_context (ToolContext, optional): Tool context for tracking state.
+        corpus_resource_name (str, optional): If provided, used directly instead of calling get_corpus_resource_name.
 
     Returns:
-        dict: Information about the added data and status
+        dict: Information about the added data and status.
     """
     # Check if the corpus exists
-    if not check_corpus_exists(corpus_name, tool_context):
+    if tool_context and not check_corpus_exists(corpus_name, tool_context):
         return {
             "status": "error",
             "message": f"Corpus '{corpus_name}' does not exist. Please create it first using the create_corpus tool.",
@@ -55,7 +53,6 @@ def add_data(
             "paths": paths,
         }
 
-    # Pre-process paths to validate and convert Google Docs URLs to Drive format if needed
     validated_paths = []
     invalid_paths = []
     conversions = []
@@ -65,7 +62,6 @@ def add_data(
             invalid_paths.append(f"{path} (Not a valid string)")
             continue
 
-        # Check for Google Docs/Sheets/Slides URLs and convert them to Drive format
         docs_match = re.match(
             r"https:\/\/docs\.google\.com\/(?:document|spreadsheets|presentation)\/d\/([a-zA-Z0-9_-]+)(?:\/|$)",
             path,
@@ -77,13 +73,11 @@ def add_data(
             conversions.append(f"{path} → {drive_url}")
             continue
 
-        # Check for valid Drive URL format
         drive_match = re.match(
             r"https:\/\/drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)(?:\/|$)",
             path,
         )
         if drive_match:
-            # Normalize to the standard Drive URL format
             file_id = drive_match.group(1)
             drive_url = f"https://drive.google.com/file/d/{file_id}/view"
             validated_paths.append(drive_url)
@@ -91,15 +85,12 @@ def add_data(
                 conversions.append(f"{path} → {drive_url}")
             continue
 
-        # Check for GCS paths
         if path.startswith("gs://"):
             validated_paths.append(path)
             continue
 
-        # If we're here, the path wasn't in a recognized format
         invalid_paths.append(f"{path} (Invalid format)")
 
-    # Check if we have any valid paths after validation
     if not validated_paths:
         return {
             "status": "error",
@@ -109,10 +100,9 @@ def add_data(
         }
 
     try:
-        # Get the corpus resource name
-        corpus_resource_name = get_corpus_resource_name(corpus_name)
+        if not corpus_resource_name:
+            corpus_resource_name = get_corpus_resource_name(corpus_name)
 
-        # Set up chunking configuration
         transformation_config = rag.TransformationConfig(
             chunking_config=rag.ChunkingConfig(
                 chunk_size=DEFAULT_CHUNK_SIZE,
@@ -120,7 +110,6 @@ def add_data(
             ),
         )
 
-        # Import files to the corpus
         import_result = rag.import_files(
             corpus_resource_name,
             validated_paths,
@@ -128,11 +117,9 @@ def add_data(
             max_embedding_requests_per_min=DEFAULT_EMBEDDING_REQUESTS_PER_MIN,
         )
 
-        # Set this as the current corpus if not already set
-        if not tool_context.state.get("current_corpus"):
+        if tool_context and not tool_context.state.get("current_corpus"):
             tool_context.state["current_corpus"] = corpus_name
 
-        # Build the success message
         conversion_msg = ""
         if conversions:
             conversion_msg = " (Converted Google Docs URLs to Drive format)"

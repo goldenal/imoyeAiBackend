@@ -12,23 +12,22 @@ from ..config import (
 )
 from .utils import check_corpus_exists
 
-
 def create_corpus(
     corpus_name: str,
-    tool_context: ToolContext,
+    tool_context: ToolContext = None,
 ) -> dict:
     """
     Create a new Vertex AI RAG corpus with the specified name.
 
     Args:
-        corpus_name (str): The name for the new corpus
-        tool_context (ToolContext): The tool context for state management
+        corpus_name (str): The name for the new corpus.
+        tool_context (ToolContext,): The tool context for state management.
 
     Returns:
-        dict: Status information about the operation
+        dict: Status information about the operation.
     """
-    # Check if corpus already exists
-    if check_corpus_exists(corpus_name, tool_context):
+    # Check if corpus already exists (if tool_context is provided)
+    if tool_context and check_corpus_exists(corpus_name, tool_context):
         return {
             "status": "info",
             "message": f"Corpus '{corpus_name}' already exists",
@@ -55,11 +54,10 @@ def create_corpus(
             ),
         )
 
-        # Update state to track corpus existence
-        tool_context.state[f"corpus_exists_{corpus_name}"] = True
-
-        # Set this as the current corpus
-        tool_context.state["current_corpus"] = corpus_name
+        # Update tool_context state if provided
+        if tool_context:
+            tool_context.state[f"corpus_exists_{corpus_name}"] = True
+            tool_context.state["current_corpus"] = corpus_name
 
         return {
             "status": "success",
