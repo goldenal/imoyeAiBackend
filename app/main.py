@@ -20,10 +20,27 @@ from google.adk.events.event import Event
 from google.adk.runners import Runner
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.genai import types
+from fastapi import File, UploadFile, Form
+from app.imoye.tools.gcs_upload import upload_file_to_gcs, GCSUploadError
 
 from app.imoye.agent import ragVoice, root_agent
+from app.imoye.tools import (
+    create_corpus,
+    delete_corpus,
+    add_data,
+    delete_document,
+    get_corpus_info,
+    list_corpora,
+    check_corpus_exists,
+    get_corpus_resource_name,
+    set_current_corpus,
+)
+from google.adk.tools.tool_context import ToolContext
+from fastapi import Body
+from typing import List, Optional
 
-
+# --- RAG API endpoints ---
+from fastapi import APIRouter
 # Load environment variables
 load_dotenv()
 
@@ -248,6 +265,84 @@ async def exception_handler(request, exc):
         status_code=500,
         content={"message": "Internal server error"}
     )
+
+
+
+
+rag_router = APIRouter(prefix="/rag", tags=["RAG"])
+
+@rag_router.post("/create_corpus")
+def api_create_corpus(corpus_name: str = Body(..., embed=True)):
+    
+    return create_corpus(corpus_name)
+
+@rag_router.delete("/delete_corpus")
+def api_delete_corpus(corpus_name: str, confirm: bool = True):
+    tool_context = ToolContext()
+    return delete_corpus(corpus_name, confirm, tool_context)
+
+@rag_router.post("/add_document")
+def api_add_document(corpus_name: str = Body(...), paths: List[str] = Body(...)):
+    
+    return add_data(corpus_name, paths)
+
+@rag_router.delete("/delete_document")
+def api_delete_document(corpus_name: str, document_id: str):
+   
+    return delete_document(corpus_name, document_id)
+
+@rag_router.get("/get_corpus_info")
+def api_get_corpus_info(corpus_name: str = Query(..., description="The name of the corpus to retrieve info for")):
+    return get_corpus_info(corpus_name=corpus_name)
+
+@rag_router.get("/list_corpora")
+def api_list_corpora():
+    return list_corpora()
+
+# --- Utils endpoints ---
+
+
+
+@rag_router.post("/upload_document")
+def api_upload_document(
+    corpus_name: str = Form(..., description="Target corpus name"),
+    file: UploadFile = File(..., description="PDF, TXT, or DOCX file ≤ 40MB")
+):
+    """
+    Upload a document (PDF, TXT, DOCX ≤40MB) to GCS and add to a RAG corpus.
+    - Uploads the file to the configured GCS bucket.
+    - Calls add_data with the GCS URL for the uploaded file.
+    Returns the file URL and add_data result.
+    """
+    try:
+        public_url, blob_name = upload_file_to_gcs(file)
+    except GCSUploadError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"GCS upload error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to upload file to GCS.")
+
+    # Call add_data with the GCS URL
+    add_result = add_data(corpus_name, [public_url])
+    return {
+        "status": "success",
+        "file_url": public_url,
+        "blob_name": blob_name,
+        "add_data_result": add_result
+    }
+
+@rag_router.get("/check_corpus_exists")
+def api_check_corpus_exists(corpus_name: str):
+    return {"exists": check_corpus_exists(corpus_name)}
+
+@rag_router.get("/get_corpus_resource_name")
+def api_get_corpus_resource_name(corpus_name: str):
+    return {"resource_name": get_corpus_resource_name(corpus_name)}
+
+    
+
+# Register the router
+app.include_router(rag_router)
 
 
 if __name__ == "__main__":
