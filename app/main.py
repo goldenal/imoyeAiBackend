@@ -23,7 +23,7 @@ from google.genai import types
 from fastapi import File, UploadFile, Form
 from app.imoye.tools.gcs_upload import upload_file_to_gcs, GCSUploadError
 
-from app.imoye.agent import ragVoice, root_agent
+from app.imoye.agent import rag_voice_agent, root_agent
 from app.imoye.tools import (
     create_corpus,
     delete_corpus,
@@ -79,7 +79,7 @@ def start_agent_session(session_id, is_audio=False):
 
     runner = Runner(
         app_name=APP_NAME,
-        agent=ragVoice,
+        agent=rag_voice_agent,
         session_service=session_service,
     )
 
